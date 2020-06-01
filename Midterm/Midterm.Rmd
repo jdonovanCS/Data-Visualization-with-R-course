@@ -1,0 +1,175 @@
+---
+title: "Midterm Exam"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(tidyverse)
+require(nycflights13)
+```
+
+
+#12.2.1 Exercises
+
+
+##(1) 12.2.1 Exercise 2
+
+Compute the rate for table2, and table4a + table4b. You will need to perform four operations:
+
+```{r 1a}
+#Using table2
+
+#Step 1 - Extract the number of TB cases per country per year.
+step1 <- table2 %>% spread(key = "type", value = "count") %>% select(country, year, cases)
+step1
+
+#Step2 - Extract the matching population per country per year.
+step2 <- table2 %>% spread(key = "type", value = "count") %>% select(country, year, population)
+step2
+
+#Step3 - Divide cases by population, and multiply by 10000.
+step3 <- rate <- (select(step1, rate = cases) / select(step2, population) * 10000)
+step3
+
+#Final - Store back in the appropriate place.
+final <- step1
+final["country"] <- step1["country"]
+final["year"] <- step1["year"]
+final["rate"] <- step3["rate"]
+final
+```
+
+```{r 1b}
+#Using table4a + table4b
+
+#Step 1 - Extract the number of TB cases per country per year.
+step1 <- table4a %>% gather(`1999`, `2000`, key = "year", value = "cases")
+step1
+
+#Step 2 - Extract the matching population per country per year.
+step2 <- table4b %>% gather(`1999`, `2000`, key = "year", value = "population")
+step2
+
+#Step 3 - Divide cases by population, and multiply by 10000.
+step3 <- rate <- (select(step1, rate = cases) / select(step2, population) * 10000)
+step3
+
+#Final - Store back in the appropriate place.
+final["country"] <- step1["country"]
+final["year"] <- step1["year"]
+final["rate"] <- step3["rate"]
+final
+```
+
+Which representation is easiest to work with? Which is hardest? Why?
+
+Which is hardest is a matter of opinion in this case. I would say both are about equally as difficult. One requires the use of gather to complete whereas the other requires the use of spread to complete. I would rank both at an equal difficulty based on this observation. The two functions gather and spread are close to opposites. We will address why they are not quite symmetrical in the next question.
+
+
+#12.3.3 Exercises
+
+
+##(2) 12.3.3 Exercise 1
+
+Why are gather() and spread() not perfectly symmetrical? Carefully consider the following example:
+
+```{r 2a}
+stocks <- tibble(
+  year   = c(2015, 2015, 2016, 2016),
+  half  = c(   1,    2,     1,    2),
+  return = c(1.88, 0.59, 0.92, 0.17)
+)
+stocks %>% 
+  spread(year, return) %>% 
+  gather("year", "return", `2015`:`2016`)
+```
+
+(Hint: look at the variable types and think about column names.)
+
+Both spread() and gather() have a convert argument. What does it do?
+
+datatypes seem to persist with spread probably because they are using the datatypes that are already present whereas they do not with gather probably because it is creating a new column that will need a datatype. With gather, the column names can also be set to the name that the user prefers because they are creating a new column, and with spread, it is automatically set to the values of the row specified to be spread.
+
+The convert argument automatically converts it to the appropriate value (logical, integer, numeric, complex, or factor).
+
+
+#16.3.4 Exercises
+
+
+##(3) 16.3.4 Exercise 2
+
+Compare dep_time, sched_dep_time and dep_delay. I recommend looking at the distributions over an hour. Are they consistent? Explain your findings.
+
+```{r 3c}
+flights %>% filter(dep_time >= 1600 & dep_time <= 1660) %>%
+ggplot(aes(x=dep_time, y=dep_delay)) + geom_smooth()
+```
+
+
+
+```{r 3d}
+flights %>% filter(sched_dep_time >= 1600 & sched_dep_time <= 1660) %>%
+ggplot(aes(x=sched_dep_time, y=dep_delay)) + geom_smooth()
+```
+
+As we can see these graphs are similar. Schedule departure time relates to departure delay in a similar but not quite as radical fashion as actual departure times over the 4PM - 5PM time frame. This is probably because as scheduled flights become late, these flights will leave later and exaggerate the departure delay of making the graph more pronounced for departure time and departure delay when compared to scheduled departure time and departure delay.
+
+##(4) 16.3.4 Exercise 4
+
+How does the average departure delay change over the course of a day? Should you use dep_time or sched_dep_time? Why?
+
+```{r 4b}
+ggplot(flights, aes(x=sched_dep_time, y=dep_delay)) + geom_smooth()
+```
+Departure delay average changes over the course of the day rising steadily from scheduled departure times starting at 5AM until 8PM. Then departure delays start declining at a similar pace until midnight. We use sched_dep_delay because this is the time that flights are supposed to leave so it does not involve the dep_delay that has already happened in dep_time column. Flights that are supposed to leave at the times above had the departure delays depicted above. We can actually calculate departure delay by taking the absolute value of the subtraction of scheduled departure time from departure time. This, again, is why we use scheduled departure time rather than departure time in this example.
+
+
+##(5) 16.3.4 Exercise 5
+
+On what day of the week should you leave if you want to minimize the chance of a departure delay?
+
+```{r 5a}
+devtools::install_github("hadley/lubridate")
+library(lubridate)
+
+# transform times into date-time format
+make_datetime_100 <- function(year, month, day, time) {
+  make_datetime(year, month, day, time %/% 100, time %% 100)
+}
+
+flights_dt <- flights %>% 
+  # Remove flights that never departed or never arrived
+  filter(!is.na(dep_time), !is.na(arr_time)) %>% 
+  # Convert times into date-times
+  mutate(
+    dep_time = make_datetime_100(year, month, day, dep_time)
+  )
+
+#group by week day and calculate average departure delay for each week day.
+flights_dt %>% 
+  mutate(wday = wday(dep_time, label = TRUE)) %>% 
+  group_by(wday) %>%
+  summarise(avg_dep_delay = mean(dep_delay, na.rm=TRUE), n = n()) %>%
+  ggplot(aes(x = wday, y=avg_dep_delay)) +
+    geom_col()
+```
+
+Saturday would be the day that one would want to travel to minimize the chance of departure delay. There are also less flights on the weekend which may be playing a factor in this.
+
+##(6) 16.3.4 Exercise 6
+
+What makes the distribution of diamonds$carat and flights$sched_dep_time similar?
+
+In both of these distributions across their respective datasets, carat and shced_dep_time have the similarity of being concentrated at certain intervals. Carat seems to be concentrated at half carat and whole carat intervals as well as below .3 carat. Scheduled departure times seems to be concentrated at intervals of every hour mark as well as slightly less at half hour marks and even less and quarter hour marks. The spaces in the flights graph represent the times that are impossible such as 1670, since this would be the same as 1710. This shows the flight distribution well since the first new line from left to right after a break will be on the hour and is also some of the tallest since that is where most of the flights are distributed.
+
+```{r 6a}
+flights %>% ggplot(aes(sched_dep_time)) + geom_histogram(binwidth=10)
+```
+
+```{r 6b}
+diamonds %>% ggplot(aes(carat)) + geom_histogram(binwidth = .1)
+```

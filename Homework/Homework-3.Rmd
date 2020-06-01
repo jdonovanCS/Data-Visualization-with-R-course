@@ -1,0 +1,381 @@
+---
+title: "Homework 3"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(tidyverse)
+require(nycflights13)
+```
+
+#5.6.7 Exercises
+
+
+##(1) 5.6.7 Exercise 1
+
+Brainstorm at least 5 different ways to assess the typical delay characteristics of a group of flights. Consider the following scenarios:
+
+A flight is 15 minutes early 50% of the time, and 15 minutes late 50% of the time.
+
+A flight is always 10 minutes late.
+
+A flight is 30 minutes early 50% of the time, and 30 minutes late 50% of the time.
+
+99% of the time a flight is on time. 1% of the time it’s 2 hours late.
+
+Which is more important: arrival delay or departure delay? Why?
+
+
+```{r 1a}
+# A flight is 15 minutes early 50% of the time, and 15 minutes late 50% of the time
+flights %>%
+  group_by(flight) %>%
+  summarize(early=sum(arr_delay<=-15, na.rm=TRUE)/n(), late=sum(arr_delay>=15, na.rm=TRUE)/n()) %>%
+  filter(early==0.5, late==0.5)
+```
+
+```{r 1b}
+# A flight is always 10 minutes late
+flights %>%
+  group_by(flight) %>%
+  summarize(late=sum(arr_delay==10, na.rm=TRUE)/n()) %>%
+  filter(late==1)
+```
+
+```{r 1c}
+# A flight is 30 minutes early 50% of the time, and 30 minutes late 50% of the time
+flights %>%
+  group_by(flight) %>%
+  summarize(early=sum(arr_delay<=-30, na.rm=TRUE)/n(), late=sum(arr_delay>=30, na.rm=TRUE)/n()) %>%
+  filter(early==0.5, late == 0.5)
+```
+
+```{r 1d}
+# 99% of the time a flight is on time. 1% of the time it's 2 hours late.
+flights %>%
+  group_by(flight) %>%
+  summarize(on_time=sum(arr_delay==0, na.rm=TRUE)/n(), late=sum(arr_delay>=120, na.rm=TRUE)/n()) %>%
+  filter(on_time==.99, late == .01)
+```
+
+This is really a subjective question to answer since it depends on the one's personal preferences to answer honestly. I can see arguments for both sides.
+
+
+##(2) 5.6.7 Exercise 3
+
+Our definition of cancelled flights (is.na(dep_delay) | is.na(arr_delay)) is slightly suboptimal. Why? Which is the most important column?
+
+All flights that arrived also departed, so we can use !is.na(dep_delay).
+
+
+##(3) 5.6.7 Exercise 4
+
+Look at the number of cancelled flights per day. Is there a pattern? Is the proportion of cancelled flights related to the average delay?
+
+```{r 3a}
+flights %>%
+  filter(is.na(dep_delay)) %>%
+  count(day)
+```
+
+```{r 3b}
+flights %>%
+  group_by(day) %>%
+  summarize(prop_can=sum(is.na(dep_delay))/n(), avg_del=mean(dep_delay, na.rm=TRUE))
+```
+
+
+##(4) 5.6.7 Exercise 6
+
+For each plane, count the number of flights before the first delay of greater than 1 hour.
+
+```{r 4a}
+flights %>%
+  group_by(tailnum) %>%
+  mutate(row_num=row_number()) %>%
+  filter(arr_delay>60) %>%
+  summarize(first_hr_del=first(row_num)-1)
+```
+
+This groups by the tailnum to begin with, then establishes a variable for the row number. From there, I filter to only the flights with an arr_delay greater than an hour. I then take all the rows before this hour delayed flight.
+
+
+#5.7.1 Exercises
+
+
+##(5) 5.7.1 Exercise 2
+
+Which plane (tailnum) has the worst on-time record?
+
+(within 5 minutes is what I say is on time)
+
+```{r 5a}
+flights %>%
+  group_by(tailnum) %>%
+  summarize(on_time=sum(arr_delay<=5, na.rm=TRUE)/n(), avg_arr_del=mean(arr_delay, na.rm=TRUE), flights=n()) %>%
+  arrange(on_time, desc(avg_arr_del))
+```
+
+
+##(6) 5.7.1 Exercise 3
+
+What time of day should you fly if you want to avoid delays as much as possible?
+
+```{r 6a}
+flights %>%
+  group_by(hour) %>%
+  summarize(arr_delay=sum(arr_delay>5, na.rm=TRUE)/n()) %>%
+  ggplot(aes(x=hour, y=arr_delay)) +
+  geom_col()
+```
+
+Evening flights seems to have the most delay, so flying at any other time is recommended.
+
+
+##(7) 5.7.1 Exercise 5
+
+Delays are typically temporally correlated: even once the problem that caused the initial delay has been resolved, later flights are delayed to allow earlier flights to leave. Using lag(), explore how the delay of a flight is related to the delay of the immediately preceding flight.
+
+```{r 7a}
+flights %>%
+  group_by(origin) %>%
+  arrange(year, month, day, hour, minute) %>%
+  mutate(prior_dep_delay=lag(dep_delay)) %>%
+  ggplot(aes(x = prior_dep_delay, y=dep_delay)) +
+  geom_point() +
+  geom_smooth()
+```
+
+
+#7.3.4 Exercises
+
+
+##(8) 7.3.4 Exercise 1
+
+Explore the distribution of each of the x, y, and z variables in diamonds. What do you learn? Think about a diamond and how you might decide which dimension is the length, width, and depth.
+
+```{r 8a}
+ggplot(diamonds, aes(x)) +
+  geom_histogram()
+```
+
+```{r 8b}
+ggplot(diamonds, aes(y)) +
+  geom_histogram()
+```
+
+```{r 8c}
+ggplot(diamonds, aes(z)) +
+  geom_histogram()
+```
+
+
+##(9) 7.3.4 Exercise 3
+
+How many diamonds are 0.99 carat? How many are 1 carat? What do you think is the cause of the difference?
+
+```{r 9a}
+ggplot(diamonds, aes(carat)) +
+  geom_histogram(binwidth=.01) +
+  coord_cartesian(xlim=c(.97, 1.03))
+```
+
+There is a much larger number of 1.00 carat diamonds purchased (1500) than there are .99 carat or close to that (32). This could be a reporting error just because it is so close or it could be because people just buy at even intervals more often.
+
+
+##(10) 7.3.4 Exercise 4
+
+Compare and contrast coord_cartesian() vs xlim() or ylim() when zooming in on a histogram. What happens if you leave binwidth unset? What happens if you try and zoom so only half a bar shows?
+
+```{r 10a}
+# full plot
+ggplot(diamonds, aes(carat, price)) +
+  geom_point() +
+  geom_smooth()
+```
+
+```{r 10b}
+# xlim
+ggplot(diamonds, aes(carat, price)) +
+  geom_point() +
+  geom_smooth() +
+  xlim(1, 3)
+```
+
+```{r 10c}
+# coord_cartesian
+ggplot(diamonds, aes(carat, price)) +
+  geom_point() +
+  geom_smooth() +
+  coord_cartesian(xlim = c(1, 3))
+```
+
+xlim() and ylim() both remove observations that are not within a set interval, but coord_cartesian() these values are all included but will be cut out if one zooms in.
+
+
+#7.4.1 Exercises
+
+
+##(11) 7.4.1 Exercise 1
+
+What happens to missing values in a histogram? What happens to missing values in a bar chart? Why is there a difference?
+
+```{r 11a}
+ggplot(flights, aes(dep_delay)) +
+  geom_histogram()
+```
+
+```{r 11b}
+# change AA to NA
+flights %>%
+  mutate(carrier=ifelse(carrier=="AA", NA, carrier)) %>%
+  ggplot(aes(carrier)) +
+  geom_bar()
+```
+
+Bar charts will draw missing values separately where histograms will just elimate these values from the graph. There isn't much value for a missing continuous value in a histogram. Bar charts map categorical variables and thus have more purpose to graph these missing values. These values can be drawn wherever specified.
+
+
+##(12) 7.4.1 Exercise 2
+
+What does na.rm = TRUE do in mean() and sum()?
+
+It eliminates values with NA (missing values) before calculation.
+
+
+#7.5.1.1 Exercises
+
+
+##(13) 7.5.1.1 Exercise 1
+
+Use what you’ve learned to improve the visualization of the departure times of cancelled vs. non-cancelled flights.
+
+```{r 13a}
+# original chart
+flights %>% 
+  mutate(
+    cand=is.na(dep_time),
+    schhour=sched_dep_time %/% 100,
+    schmin = sched_dep_time %% 100,
+    sched_dep_time = schhour+schmin/60
+    ) %>%
+  ggplot(mapping=aes(sched_dep_time)) + 
+  geom_freqpoly(mapping=aes(colour=cand), binwidth=1/4)
+```
+
+```{r 13b}
+# revised chart
+flights %>% 
+  mutate(
+    cand=is.na(dep_time),
+    schhour=sched_dep_time %/% 100,
+    schmin=sched_dep_time %% 100,
+    sched_dep_time=schhour+schmin/60
+    ) %>%
+  ggplot(aes(x=sched_dep_time, y=..density.., color=cand)) + 
+  geom_freqpoly(binwidth=1/4)
+```
+
+
+##(14) 7.5.1.1 Exercise 4
+
+One problem with boxplots is that they were developed in an era of much smaller datasets and tend to display a prohibitively large number of “outlying values”. One approach to remedy this problem is the letter value plot. Install the lvplot package, and try using geom_lv() to display the distribution of price vs cut. What do you learn? How do you interpret the plots?
+
+```{r 14a}
+devtools::install_github("hadley/lvplot")
+```
+
+```{r 14b}
+library(lvplot)
+
+# with boxplot
+ggplot(diamonds, aes(cut, price)) +
+  geom_boxplot()
+```
+
+```{r 14c}
+# with lvplot
+ggplot(diamonds, aes(cut, price)) +
+  geom_lv()
+```
+
+
+#7.5.2.1 Exercises
+
+
+##(15) 7.5.2.1 Exercise 1
+
+How could you rescale the count dataset above to more clearly show the distribution of cut within color, or color within cut?
+
+We could use a bar graph to show how the distributions across color and cut compare to one another. This is a very easy way to visualize the difference across this dataset.
+
+```{r 15a}
+diamonds %>%
+  count(color, cut) %>%
+  ggplot(mapping = aes(x = color, y = n, fill=color)) +
+     geom_col() + facet_grid( ~cut )
+```
+
+We could also use geom_raster as it is very similar to geom_tile and add some aesthetic changes that will change the look of the data, but it will not change much about how we interpret it.
+
+```{r 15b}
+diamonds %>% 
+  count(color, cut) %>%  
+  ggplot(mapping = aes(x = color, y = cut)) +
+     geom_raster(mapping = aes(alpha = n), interpolate = TRUE)
+```
+
+##(16) 7.5.2.1 Exercise 2
+
+Use geom_tile() together with dplyr to explore how average flight delays vary by destination and month of year. What makes the plot difficult to read? How could you improve it?
+
+```{r 16a}
+flights %>%
+  select(dep_delay, month, dest)
+  ggplot(data = flights, mapping = aes(x=month, y=dest)) +
+     geom_tile(mapping=aes(fill=dep_delay))
+```
+
+This is difficult to read because there are so many destinations that it is difficult to decipher between them. We could improve this by filtering this dataset to only those destinations that met a significant average of departure or arrival delays.
+
+#7.5.3.1 Exercises
+
+
+##(17) 7.5.3.1 Exercise 1
+
+Instead of summarizing the conditional distribution with a boxplot, you could use a frequency polygon. What do you need to consider when using cut_width() vs cut_number()? How does that impact a visualization of the 2D distribution of carat and price?
+
+```{r 17a}
+smaller <- diamonds %>% filter(carat < 3)
+ggplot(data = smaller) + 
+   geom_freqpoly(mapping = aes(x=price, group=cut_width(carat, 20)))
+```
+
+```{r 17b}
+ggplot(data = smaller) + 
+   geom_freqpoly(mapping = aes(x=price, group=cut_number(carat, 20)))
+```
+
+The difference between cut_width and cut_number is that cut_width defines the width of the scale that the groups will be cut into whereas cut_number defines the number of observations that will be in each group. In this case cut_width is giving a width of 20 and cut_number is dividing the dataset into 20 groups of equal number of observations. 
+
+
+##(18) 7.5.3.1 Exercise 2
+
+Visualize the distribution of carat, partitioned by price.
+
+```{r 18a}
+ggplot(data = smaller, mapping = aes(x = carat, price)) + 
+  geom_boxplot(mapping = aes(group = cut_width(price, 50)))
+```
+
+
+##(19) 7.5.3.1 Exercise 3
+
+How does the price distribution of very large diamonds compare to small diamonds. Is it as you expect, or does it surprise you?
+
+It is as I would expect as the carat gets larger the price also gets larger. As the carat size maximizes, the price drops slightly which is a little surprising.
+

@@ -1,0 +1,493 @@
+---
+title: "FinalProject"
+author: "Jordan Donovan"
+date: "April 4, 2017"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Final Project - Breaches
+
+```{r fig1}
+library(readr)
+library(tidyverse)
+require(dplyr)
+breaches <- read_csv("~/Downloads/breaches.csv")
+View(breaches)
+```
+We may need to remove Date_of_Breach to tidy the dataset. Really only thing I've seen.
+
+
+First we will start by exploring the dataset from a breadth first approach. These initial examinations will be where we glean our direction for the following exploration in this document.
+
+
+
+
+Date:
+
+```{r fig2}
+breaches %>%
+  filter(year > 2009 & year < 2014) %>%
+  group_by(year) %>%
+  summarise(num_of_cases = n()) %>%
+  ggplot(mapping=aes(x=year, y=num_of_cases)) + geom_col()
+```
+
+
+```{r fig3}
+breaches %>%
+  filter(year > 2009 & year < 2014) %>%
+  group_by(year) %>%
+  summarise(Individuals_Affected_in_Mil=sum(Individuals_Affected/1000000)) %>%
+  ggplot(mapping=aes(x=year, y=Individuals_Affected_in_Mil)) +
+    geom_col()
+  #geom_smooth()
+```
+
+
+```{r fig4}
+#Top 5 types of breaches according to individuals affected by breach
+breach_for_pie <- breaches %>%
+  filter(year > 2009 & year < 2014) %>%
+  group_by(year) %>%
+  summarise(Individuals_Affected_in_mil = sum(Individuals_Affected/1000000)) %>%
+  arrange(desc(Individuals_Affected_in_mil)) %>%
+  top_n(5)
+slices <- breach_for_pie$Individuals_Affected_in_mil
+lbls <- breach_for_pie$year
+pct <- round(slices/sum(slices) * 100)
+lbls <- paste(lbls, pct)
+lbls <- paste(lbls, "%", sep="")
+  pie(slices, labels=lbls, col=rainbow(length(lbls)), main="Type of Breach and Individuals Affected in Million")
+```
+
+```{r fig4}
+require(lubridate)
+
+breaches_date_affected <- breaches %>% filter(!is.na(breach_start) & year < 2014 & year > 2009) %>%
+  mutate(month = month(breach_start, label=TRUE)) %>%
+  group_by(month) %>%
+  summarise(Individuals_Affected_in_mil = sum(Individuals_Affected/1000000)) %>%
+  ggplot(aes(x=month, y=Individuals_Affected_in_mil)) + geom_col()
+breaches_date_affected
+```
+
+```{r fig5}
+require(lubridate)
+
+make_date_100 <- function(year, month, day) {
+  make_date(year, month, day)
+}
+
+breaches_by_date_2 <- breaches %>% filter(!is.na(breach_start) & year < 2014 & year > 2009) %>%
+  mutate(month = month(breach_start, label = TRUE), day = day(breach_start), breach_start_date = make_date(year, month, day)) %>%
+  ggplot(aes(breach_start_date)) + geom_freqpoly(binwidth = month(1) %>% as.numeric())
+breaches_by_date_2
+```
+
+```{r fig6}
+#Plot by month individuals affected
+#fit a model to this using MAD or something other than RMS
+require(lubridate)
+make_date_100 <- function(year, month, day) {
+  make_date(year, month, day)
+}
+
+breaches_date <- breaches %>% filter(!is.na(breach_start) & year < 2014 & year > 2009) %>%
+  mutate(month = month(breach_start, label=TRUE), num_of_occurrences = n()) %>%
+  ggplot(aes(x=month, y=num_of_occurrences)) + geom_col(alpha = 1)
+breaches_date
+```
+
+```{r fig22a}
+require(lubridate)
+
+make_date_100 <- function(year, month) {
+  make_date(year, month, day)
+}
+
+breaches_by_date_2 <- breaches %>% filter(!is.na(breach_start) & year < 2014 & year > 2009) %>%
+  mutate(month = month(breach_start, label = TRUE), day = day(breach_start), breach_start_date = make_date(year, month)) %>%
+  ggplot(aes(breach_start_date)) + geom_bar()
+breaches_by_date_2
+```
+
+```{r fig23}
+require(lubridate)
+
+make_date_100 <- function(year, month, day) {
+  make_date(year, month)
+}
+
+breaches_by_date_3 <- breaches %>% filter(!is.na(breach_start) & year < 2014 & year > 2009) %>%
+  mutate(month = month(breach_start, label = TRUE), day = day(breach_start), breach_start_date = make_date(year, month)) %>%
+  group_by(breach_start_date) %>%
+  summarise(Individuals_Affected_in_thou = sum(Individuals_Affected/1000)) %>%
+  ggplot(aes(x = breach_start_date, y = Individuals_Affected_in_thou)) + geom_col()
+breaches_by_date_3
+```
+
+```{r fig24}
+require(lubridate)
+
+make_date_100 <- function(year, month, day) {
+  make_date(year, month)
+}
+
+breaches_by_date4 <- breaches %>% filter(!is.na(breach_start) & year < 2014 & year > 2009) %>%
+  mutate(month = month(breach_start, label=TRUE), day=day(breach_start), breach_start_date = make_date(year, month)) %>%
+  group_by(breach_start_date) %>%
+  summarise(Individuals_Affected_in_thou = sum(Individuals_Affected/1000))
+
+models <- tibble(
+    a0 = runif(250, -2000, 4000),
+    a1 = runif(250, -5000, 5000)
+  )
+
+p2 <- ggplot(breaches_by_date4, aes(breach_start_date, Individuals_Affected_in_thou)) + geom_abline(aes(intercept = a0, slope=a1), data = models, alpha = 1/4) + geom_point()
+  p2
+
+  dataset_mod <- lm(Individuals_Affected_in_thou ~breach_start_date, data = breaches_by_date4)
+  coef(dataset_mod) %>% str()
+  p3 <- summary(dataset_mod)$r.squared * 100
+  p3
+  
+  p4 <- ggplot(breaches_by_date4, aes(breach_start_date, Individuals_Affected_in_thou)) +
+  geom_point(size = 2, color = "grey40") +
+  geom_abline(intercept = coef(dataset_mod)[1], slope = coef(dataset_mod)[2], color = "blue")
+  p4
+  
+  #grid <- breaches_by_date4 %>%
+    #add_predictions(dataset_mod)
+  #print(grid)
+
+```
+
+```{r fig24}
+require(lubridate)
+
+make_date_100 <- function(year, month, day) {
+  make_date(year, month)
+}
+
+breaches_by_date5 <- breaches %>% filter(!is.na(breach_start) & year < 2014 & year > 2009) %>%
+  mutate(month = month(breach_start, label=TRUE), day=day(breach_start), breach_start_date = make_date(year, month)) %>%
+  group_by(breach_start_date) %>%
+  summarise(num_of_occurrences = n())
+
+models <- tibble(
+    a0 = runif(250, -2000, 4000),
+    a1 = runif(250, -5000, 5000)
+  )
+
+p2 <- ggplot(breaches_by_date5, aes(breach_start_date, num_of_occurrences)) + geom_abline(aes(intercept = a0, slope=a1), data = models, alpha = 1/4) + geom_point()
+  p2
+
+  dataset_mod <- lm(num_of_occurrences ~breach_start_date, data = breaches_by_date5)
+  coef(dataset_mod) %>% str()
+  p3 <- summary(dataset_mod)$r.squared * 100
+  p3
+  
+  p4 <- ggplot(breaches_by_date5, aes(breach_start_date, num_of_occurrences)) +
+  geom_point(size = 2, color = "grey40") +
+  geom_abline(intercept = coef(dataset_mod)[1], slope = coef(dataset_mod)[2], color = "blue")
+  p4
+  
+  #grid <- breaches_by_date4 %>%
+    #add_predictions(dataset_mod)
+  #print(grid)
+
+```
+
+
+
+
+
+Type/Date
+
+```{r fig7}
+breaches %>%
+  filter(year > 2009 & year < 2014) %>%
+  group_by(Type_of_Breach, year) %>%
+  summarise(Individuals_Affected_in_mil=sum(Individuals_Affected/1000000)) %>%
+  ggplot(mapping=aes(x=year, size=Individuals_Affected_in_mil, y=Type_of_Breach)) +
+  geom_point()
+```
+
+
+
+
+
+Type:
+
+```{r fig8}
+breaches %>%
+  filter(year > 2009 & year < 2014) %>%
+  group_by(Type_of_Breach) %>%
+  summarise(Individuals_Affected_in_Mil=sum(Individuals_Affected/1000000)) %>%
+  ggplot(mapping=aes(x=Type_of_Breach, y=Individuals_Affected_in_Mil)) +
+  geom_col()
+```
+
+
+
+```{r fig6}
+#Top 5 types of breaches according to individuals affected by breach
+breaches %>%
+  group_by(Type_of_Breach) %>%
+  summarise(Individuals_Affected_in_mil=sum(Individuals_Affected/1000000)) %>%
+  arrange(desc(Individuals_Affected_in_mil)) %>%
+  top_n(5) %>%
+  ggplot(mapping=aes(x=Type_of_Breach, y=Individuals_Affected_in_mil, fill=Type_of_Breach)) +
+  geom_col()
+```
+
+```{r fig6a}
+#Top 5 types of breaches according to individuals affected by breach
+breach_for_pie <- breaches %>%
+  group_by(Type_of_Breach) %>%
+  summarise(Individuals_Affected_in_mil=sum(Individuals_Affected/1000000)) %>%
+  arrange(desc(Individuals_Affected_in_mil)) %>%
+  top_n(5)
+slices <- breach_for_pie$Individuals_Affected_in_mil
+lbls <- breach_for_pie$Type_of_Breach
+pct <- round(slices/sum(slices) * 100)
+lbls <- paste(lbls, pct)
+lbls <- paste(lbls, "%", sep="")
+  pie(slices, labels=lbls, col=rainbow(length(lbls)), main="Type of Breach and Individuals Affected")
+```
+
+```{r fig6a}
+#Top 5 types of breaches according to individuals affected by breach
+breach_for_pie <- breaches %>%
+  group_by(Type_of_Breach) %>%
+  summarise(num_of_occurrences=n()) %>%
+  arrange(desc(num_of_occurrences)) %>%
+  top_n(5)
+slices <- breach_for_pie$num_of_occurrences
+lbls <- breach_for_pie$Type_of_Breach
+pct <- round(slices/sum(slices) * 100)
+lbls <- paste(lbls, pct)
+lbls <- paste(lbls, "%", sep="")
+  pie(slices, labels=lbls, col=rainbow(length(lbls)), main="Type of Breach and Number of Occurrences")
+```
+
+
+```{r fig7}
+#Top 5 types of breaches according to number of occurrences
+breaches %>%
+  group_by(Type_of_Breach) %>%
+  summarise(num_of_occurrences = n()) %>%
+  top_n(5) %>%
+  ggplot(mapping=aes(x=Type_of_Breach, y=num_of_occurrences, fill=Type_of_Breach)) +
+  geom_col()
+```
+```{r fig18}
+breaches %>% filter(Type_of_Breach %in% (top_Breach_Types$Type_of_Breach)) %>%
+  group_by(Type_of_Breach) %>%
+  #summarise(Individuals_Affected_in_mil = sum(Individuals_Affected/1000000)) %>%
+  #mutate(Individuals_Affected_in_mil = sum(Individuals_Affected/1000000)) %>%
+  mutate(num_of_occurrences = n()) %>%
+  mutate(Individuals_Affected_in_thou = (Individuals_Affected/1000)) %>%
+  ggplot(mapping=aes(x=num_of_occurrences, color=Type_of_Breach, y=Individuals_Affected_in_thou)) +
+  stat_summary()
+```
+
+```{r fig15}
+breaches %>% filter(Type_of_Breach %in% (top_Breach_Types$Type_of_Breach)) %>%
+  ggplot(mapping = aes(x=Type_of_Breach, y=Individuals_Affected, color=Type_of_Breach)) + stat_summary()
+```
+
+```{r fig16}
+breaches %>% filter(Type_of_Breach %in% (top_Breach_Types$Type_of_Breach)) %>%
+  group_by(Type_of_Breach) %>%
+  summarise(Individuals_Affected_avg = mean(Individuals_Affected)) %>%
+  ggplot(mapping = aes(x=Type_of_Breach, y=Individuals_Affected_avg, fill=Type_of_Breach)) + geom_col(size=5)
+```
+
+```{r fig17}
+breaches %>% filter(Type_of_Breach %in% (top_Breach_Types$Type_of_Breach)) %>%
+  group_by(Type_of_Breach) %>%
+  summarise(num_of_occurrences = n()) %>%
+  ggplot(mapping = aes(x=Type_of_Breach, y=num_of_occurrences, fill=Type_of_Breach)) + geom_col(size = 5)
+```
+
+```{r fig19}
+dataset <- breaches %>%
+  group_by(Type_of_Breach) %>%
+  summarise(Individuals_Affected_in_mil=sum(Individuals_Affected/1000000)) %>%
+  arrange(desc(Individuals_Affected_in_mil)) %>%
+  top_n(5)
+
+  ggplot(data=dataset, mapping=aes(x=reorder(Type_of_Breach, -Individuals_Affected_in_mil), y=Individuals_Affected_in_mil, fill=Type_of_Breach)) +
+  geom_col()
+
+dataset
+
+models <- tibble(
+    a0 = runif(250, -20, 40),
+    a1 = runif(250, -5, 5)
+  )
+
+p2 <- ggplot(dataset, aes(reorder(Type_of_Breach, -Individuals_Affected_in_mil), Individuals_Affected_in_mil)) + geom_abline(aes(intercept = a0, slope=a1), data = models, alpha = 1/4) + geom_point()
+  p2
+
+  dataset_mod <- lm(reorder(Type_of_Breach, -Individuals_Affected_in_mil) ~Individuals_Affected_in_mil, data = dataset)
+  coef(dataset_mod) %>% str()
+  p3 <- summary(dataset_mod)$r.squared * 100
+  p3
+  
+  p4 <- ggplot(dataset, aes(reorder(Type_of_Breach, -Individuals_Affected_in_mil), Individuals_Affected_in_mil)) +
+  geom_point(size = 2, color = "grey40") +
+  geom_abline(intercept = coef(dataset_mod)[1], slope = coef(dataset_mod)[2], color = "blue")
+  p4
+  
+  #grid <- dataset %>%
+    #add_predictions(dataset_mod)
+  #print(grid)
+```
+
+
+
+
+
+
+
+Type/State:
+
+```{r fig11}
+top_Breach_Types <- breaches %>% group_by(Type_of_Breach) %>%
+  summarise(Individuals_Affected_in_mil=sum(Individuals_Affected/1000000)) %>%
+  arrange(desc(Individuals_Affected_in_mil)) %>%
+  top_n(5) %>%
+  select(Type_of_Breach)
+
+top_Breach_Types
+
+top_States <- breaches %>%
+  group_by(State) %>%
+  summarise(Individuals_Affected_in_mil=sum(Individuals_Affected/1000000)) %>%
+  arrange(desc(Individuals_Affected_in_mil)) %>%
+  top_n(5) %>%
+  select(State)
+  #group_by(Type_of_Breach, State) %>%
+  #summarise(Individuals_Affected_in_mil = sum(Individuals_Affected/1000000)) %>%
+  #top_n(1) %>%
+
+top_States
+
+both <- breaches %>% filter(Type_of_Breach %in% (top_Breach_Types$Type_of_Breach) & State %in% (top_States$State))
+
+both %>% group_by(Type_of_Breach, State) %>%
+  summarise(Individuals_Affected_in_mil = sum(Individuals_Affected/1000000)) %>%
+  ggplot(mapping=aes(x=State, y=Type_of_Breach, size=Individuals_Affected_in_mil)) +
+  geom_point()
+```
+
+```{r fig 12}
+breaches %>% ggplot(mapping=aes(x=Date_of_Breach, y=State)) + geom_point()
+```
+
+```{r fig13}
+breaches_by_date <- both %>%
+  group_by(Date_of_Breach)
+  #summarise(Individuals_Affected_in_mil = sum(Individuals_Affected))
+breaches_by_date
+
+ggplot(data=breaches_by_date, mapping=aes(x=Date_of_Breach, y=State)) +
+  geom_line() +
+  facet_grid(Type_of_Breach ~ .)
+
+##maybe try grouping by date..
+```
+
+
+
+
+State:
+
+```{r fig8}
+breaches %>%
+  group_by(State) %>%
+  summarise(Individuals_Affected_in_mil = sum(Individuals_Affected/1000000)) %>%
+  top_n(15) %>%
+  ggplot(mapping = aes(x=State, y=Individuals_Affected_in_mil, fill=State)) +
+  geom_col();
+```
+
+```{r fig9}
+#map(database = 'county')
+```
+
+
+
+
+Location:
+
+```{r fig10}
+breaches %>%
+  group_by(Location_of_Breached_Information) %>%
+  summarise(Individuals_Affected_in_mil = sum(Individuals_Affected/1000000)) %>%
+  top_n(5) %>%
+  ggplot(mapping = aes(x=Location_of_Breached_Information, y=Individuals_Affected_in_mil, fill=Location_of_Breached_Information)) +
+  geom_col()
+```
+
+```{r fig10a}
+top_Locations <- breaches %>%
+  group_by(Location_of_Breached_Information) %>%
+  summarise(Individuals_Affected_in_mil = sum(Individuals_Affected/1000000)) %>%
+  arrange(desc(Individuals_Affected_in_mil)) %>%
+  top_n(5) %>%
+  select (Location_of_Breached_Information)
+
+breaches %>% filter(Location_of_Breached_Information %in% top_Locations$Location_of_Breached_Information) %>%
+  group_by(Location_of_Breached_Information) %>%
+  summarise(Individuals_Affected_in_mil = sum(Individuals_Affected/1000000)) %>%
+  ggplot(mapping = aes(x=Location_of_Breached_Information, y=Individuals_Affected_in_mil, fill=Location_of_Breached_Information)) +
+  geom_col()
+```
+
+
+```{r fig10b}
+breaches %>% filter(Location_of_Breached_Information %in% top_Locations$Location_of_Breached_Information) %>%
+  group_by(Location_of_Breached_Information) %>%
+  #summarise(Individuals_Affected_in_mil = sum(Individuals_Affected/1000000)) %>%
+  ggplot(mapping = aes(x=Location_of_Breached_Information, y=Individuals_Affected, color=Location_of_Breached_Information)) +
+  stat_summary()
+```
+
+```{r fig10b}
+breaches %>% filter(Location_of_Breached_Information %in% top_Locations$Location_of_Breached_Information) %>%
+  group_by(Location_of_Breached_Information) %>%
+  mutate(num_of_occurrences = n()) %>%
+  mutate(Individuals_Affected_in_thou = (Individuals_Affected/1000)) %>%
+  #summarise(Individuals_Affected_in_mil = sum(Individuals_Affected/1000000)) %>%
+  ggplot(mapping = aes(x=num_of_occurrences, y=Individuals_Affected, color=Location_of_Breached_Information)) +
+  stat_summary()
+```
+
+
+
+As I begin to analyze this data further, it begins to become apparent that the credibility of this data and its source are not quite at the standard desired.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

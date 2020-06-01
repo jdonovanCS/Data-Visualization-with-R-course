@@ -1,0 +1,376 @@
+---
+title: "Final Exam"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, cache=TRUE, fig.asp=0.65, fig.width=3.5)
+library(tidyverse)
+library(modelr)
+options(na.action = na.warn)
+
+library(nycflights13)
+library(lubridate)
+library(dplyr)
+library(viridis)
+library(forcats)
+library(stringr)
+library(splines)
+```
+
+
+#24.2.3 Exercises
+
+
+##(1) 24.2.3 Exercise 1
+
+In the plot of lcarat vs. lprice, there are some bright vertical strips. What do they represent? Visually demonstrate your hypothesis with plot(s).
+
+```{r 1a}
+diamonds2 <- diamonds %>% 
+  filter(carat <= 2.5) %>% 
+  mutate(lprice = log2(price), lcarat = log2(carat))
+
+ggplot(diamonds2, aes(lcarat, lprice)) + 
+  geom_hex(bins = 50)
+```
+
+In a logarithmic scale a constant percentage trend is seen as a constant vertical or horizontal line, so these vertical concentrations of datum are percentage trends from the original dataset. I will attempt to show this below. Logarithmic scales will show exponential data trends as linear trends. 
+
+```{r 1b}
+mod_cp <- lm(lprice ~ lcarat, data=diamonds2)
+
+p_grid <- diamonds2 %>%
+  data_grid(carat = seq_range(carat, 20)) %>%
+  mutate(lcarat = log2(carat)) %>%
+  add_predictions(mod_cp, "lprice") %>%
+  mutate(price = 2 ^ lprice)
+
+ggplot(diamonds2, aes(carat, price)) +
+  geom_hex(bins = 50) +
+  scale_fill_viridis() +
+  geom_line(data = p_grid, color = "red", size = 1) + 
+  geom_smooth(method="lm", se=FALSE, color="blue", formula = y ~ poly(x,2)) +
+  geom_smooth(color= "green", formula = y~x, method="lm", se=FALSE)
+
+
+#diamonds %>% filter(carat <= 2.5) %>%
+  #mutate(scarat = carat^2) %>%
+  #ggplot(aes(carat, price)) +
+  #geom_hex(bins = 100) +
+  #geom_hex(bins = 100, color="red", x=carat, y=scarat) +
+#+ geom_point(aes(x=carat^2, y=price, color="red"))
+  #geom_smooth(method="lm", se=FALSE, color="red", formula = y ~ poly(x,2))
+  
+  #diamonds %>% filter(carat <= 2.5) %>%
+  #ggplot(aes(carat, price)) +
+  #geom_hex(bins = 100) +
+  #geom_smooth(color= "green", formula = y~x, method="lm", se=FALSE)
+
+```
+
+
+We can see by plotting a quadratic regression line that it seems the data has an exponential trend much like we saw by the highlighted vertical lines in the logarithmic plot. We can see from the comparison of the two of these that there seems to be a stronger exponential trend than a linear one in the data. We can also see an exponential curve look from the graph above. The blue line represents the exponential curve. The red line represents the prediction after it has been transformed back into the original dataset versus the logarithmic plot. The green line represents the linear regression. We can see that there is a stronger exponential trend than linear. We could also look at the residuals for these graphs and see this trend. If we look at the residuals we would see how successful this prediction really is since it will remove the linear patter in the logarithmic data. This data above also tells us that large diamonds (bigger carat) are much cheaper than they should be because there is a cut off for price in this dataset.
+
+
+##(2) 24.2.3 Exercise 2
+
+If log(price) = a_0 + a_1 * log(carat), what does that say about the relationship between price and carat?
+
+That there is an exponential trend between the two that will result in a linear model if we map the logs. We can see that because the above appears very similar to a linear graph with the formula y=mx+b.
+
+log(price) = a_1 * log(carat) + b 
+
+where log(price) = y, a_1 = m (or slope), x = log(carat), and a_0 = b (or y-intercept). 
+
+
+##(3) 24.2.3 Exercise 3
+
+From the complicated model mod_diamonds2 in the chapter, extract the diamonds that have very high and very low residuals. Is there anything unusual about these diamonds? Is there something else in the dataset that can explain their unexpected price, or do you think these are pricing errors?
+
+```{r 3a}
+diamonds2 <- diamonds %>% 
+  filter(carat <= 2.5) %>% 
+  mutate(lprice = log2(price), lcarat = log2(carat))
+
+mod_diamond <- lm(lprice ~ lcarat, data = diamonds2)
+
+diamonds2 <- diamonds2 %>% 
+  add_residuals(mod_diamond, "lresid")
+
+mod_diamond2 <- lm(lprice ~ lcarat + color + cut + clarity, data = diamonds2)
+
+diamonds2 <- diamonds2 %>% 
+  add_residuals(mod_diamond2, "lresid2")
+
+ggplot(diamonds2, aes(lcarat, lresid2)) + 
+  geom_hex(bins = 50)
+```
+
+```{r 3b}
+diamonds2a <- diamonds2 %>% 
+  filter(abs(lresid2) > 1) %>% 
+  add_predictions(mod_diamond2) %>% 
+  mutate(pred = round(2 ^ pred)) %>% 
+  select(price, pred, carat:table, x:z) %>% 
+  arrange(price)
+diamonds2a
+
+  ggplot(diamonds2a, aes(carat, price)) +
+  geom_hex(bins = 50)
+```
+
+
+We can see from this model that there are some diamonds that are very low in price in comparison with the rest of the diamonds as well as a couple that are very high in price in comparison with other diamonds of the same carat. These are the outliers with absolute value of 1 or greater than the other residuals making them a drastic price difference from the rest of the diamonds in the dataset. I looked at the rest of the parameters pertaining to these diamonds and they all seem reletavily normal/average. I believe these are most likely either pricing errors or possibly sales of some sort.
+
+##(4) 24.2.3 Exercise 4
+
+Does the final model, mod_diamonds2, do a good job of predicting diamond prices? Would you trust it to tell you how much to spend if you were buying a diamond?
+
+I would say that yes mod_diamonds2 does a fairly good job of predicting diamond prices. I would trust the main portion of it and my analytical skills of the information to tell me how much to spend if I were buying a diamond. There are some outliers that we have seen, and that, as far as I can tell, do not have a reason for being such outliers. Overall, I would trust the mod_diamond2 model in buying a diamond.
+
+#24.3.5 Exercises
+
+##(5) 24.3.5 Exercise 1
+
+Come up with the likely reason why there were fewer than expected flights on Jan 20, May 26, and Sep 1. (Hint: they all have the same explanation.) How would these days generalize to another year?
+
+```{r 5a}
+
+daily <- flights %>% 
+  mutate(date = make_date(year, month, day)) %>% 
+  group_by(date) %>% 
+  summarise(n = n())
+
+daily <- daily %>% 
+  mutate(wday = wday(date, label = TRUE))
+
+mod <- lm(n ~ wday, data = daily)
+
+daily <- daily %>% 
+  add_residuals(mod)
+resid
+```
+
+```{r 5b}
+ggplot(daily, aes(date, resid)) +
+  geom_ref_line(h = 0) +
+  geom_line() +
+  scale_x_date(breaks = c(
+    ymd("2013-01-20"),
+    ymd("2013-05-26"),
+    ymd("2013-09-01")))
+```
+
+These days were all Sundays before federal holidays. January 20 was Inauguration Day and the next Day was Martin Luther King Jr. Day, a federal holiday. May 26 was the Sunday before Memorial Day. September 1 was the Sunday before labor day. These days generalized to another year may not have as much of an impact since these days of the month do not always fall on the same day of the week. These holidays are always on Mondays, so there will probably always be a drop in the number of flights the Sunday before. However, they will not always be on January 21, May 27, and September 2, and thus, these days will not always be the days of the month experiencing this dip.
+
+
+##(6) 24.3.5 Exercise 2
+
+What do the three days with high positive residuals represent? How would these days generalize to another year?
+
+```{r 6a}
+daily %>%
+  top_n(3, resid)
+```
+
+
+These represent the holidays of weekend after Thanksgiving travel and the weekend after Christmas travel. Christmas will translate to every year since it is always on the same day of the month and person will presumably always travel to see their families for this holiday. Similarly, Thanksgiving will most likely generalize to every year, but it will be a different day of the month each year.
+
+##(7) 24.3.5 Exercises Exercise 3
+Create a new variable that splits the wday variable into terms, but only for Saturdays; it should have Sun through Fri, but  Sat-spring, Sat-summer, Sat-fall. How does this model compare with the model with every combination of wday and  term?
+
+for each saturday examine term, then add the saturdays that are the same term into the same data variable
+
+```{r 7a}
+term <- function(date) {
+  cut(date, 
+    breaks = ymd(20130101, 20130605, 20130825, 20140101),
+    labels = c("spring", "summer", "fall") 
+  )
+}
+
+daily <- daily %>% 
+  mutate(term = term(date)) 
+
+mod1 <- lm(n ~ wday, data = daily)
+
+grid <- daily %>% 
+  data_grid(wday) %>% 
+  add_predictions(mod1, "n")
+
+ggplot(daily, aes(wday, n)) +
+  geom_boxplot() + 
+  geom_point(data = grid, colour = "red")
+
+#map2(mu, sigma, rnorm, n = 5) %>% str()
+```
+
+```{r 7b}
+mod2 <- lm(n ~ wday * term, data = daily)
+
+grid <- daily %>% 
+  data_grid(wday, term) %>% 
+  add_predictions(mod2, "n")
+
+ggplot(daily, aes(wday, n)) +
+  geom_boxplot() + 
+  geom_point(data = grid, colour = "red") + 
+  facet_wrap(~ term)
+```
+
+```{r 7c}
+mod2 <- lm(n ~ wday, data = daily)
+
+extract_term_from_Saturday <- function(data)
+{
+  data[, 3] <- sapply(data[, 3], as.character)
+  for(i in 1:nrow(data)){
+    day <- data[i, 3]
+    term <- data[i, 5]
+    if(day == "Sat")
+    {
+      if(term == 'spring')
+      {
+        data[i, 3] <- as.character("Sat-spring")
+      }
+      if(term == 'summer')
+      {
+        data[i, 3] <- as.character("Sat-summer")
+      }
+      if(term == 'fall')
+      {
+        data[i, 3] <- as.character("Sat-fall")
+      }
+      if(term == 'winter')
+      {
+        data[i, 3] <- "Sat-winter"
+      }
+    }
+  }
+  return(data)
+}
+daily3 <- extract_term_from_Saturday(daily)
+daily3
+
+mod3 <- lm(n ~ wday, data = daily3)
+
+grid <- daily3 %>% 
+  data_grid(wday) %>% 
+  add_predictions(mod3, "n")
+grid
+
+daily3 %>%
+ggplot(aes(wday, n)) +
+  geom_boxplot() + 
+  geom_point(data = grid, colour="red")
+
+```
+Hints: Creating this variable is somewhat challenging, because it is a function of both wday and term, but term is only used when wday is “Sat”. Function such as mutate operate on whole vectors, but the logic here needs to operate on the components of each vector. In other words, daily is a table and wday and term are columns, but the logic needs to operate on each row. One way to do the calculation is to use a for loop, using an index such as “i” to access each row. However, I found the function  map2_chr(), described in 21.7, to be a more functional way of accomplishing the same thing. (Of course, there are probably other clever ways of calculating this variable.)
+
+
+##(8) 24.3.5 Exercise 4
+
+Create a new variable that combines wday, the day of week, term (for Saturdays), and public holidays. What do the residuals of that model look like? How does it compare to the model with every combination of wday and term?
+
+I'm not exactly sure what is expected of me to accomplish here I can create a wday variable that combines day of the week and term for Saturdays as seen above. It will be extremely tough to do this for all public holidays unless I hardcode them into the function. I can definitely do that though.
+
+
+```{r 8a}
+extract_term_from_Saturday <- function(data)
+{
+  data[, 3] <- sapply(data[, 3], as.character)
+  for(i in 1:nrow(data)){
+    day <- data[i, 3]
+    term <- data[i, 5]
+    if(day == "Sat")
+    {
+      if(term == 'spring')
+      {
+        data[i, 3] <- as.character("Sat-spring")
+      }
+      if(term == 'summer')
+      {
+        data[i, 3] <- as.character("Sat-summer")
+      }
+      if(term == 'fall')
+      {
+        data[i, 3] <- as.character("Sat-fall")
+      }
+      if(term == 'winter')
+      {
+        data[i, 3] <- "Sat-winter"
+      }
+    }
+  }
+  return(data)
+}
+
+extract_public_holidays <- function(data)
+{
+  for(i in 1:nrow(data))
+  {
+    date <- data[i, 1]
+    if (date == '2013-01-01' | date == '2013-01-21' | date == '2013-01-24' |
+        date == '2013-02-02' | date == '2013-02-12' | date == '2013-02-14' | date == '2013-02-18' |
+        date == '2013-03-10' | date == '2013-03-17' | date == '2013-03-29' | date == '2013-03-31' |
+        date == '2013-04-01' | date == '2013-04-22' |
+        date == '2013-05-05' | date == '2013-05-12' | date == '2013-05-18' | date == '2013-05-19' | date == '2013-05-20' | date == '2013-05-27' |
+        date == '2013-06-14' | date == '2013-06-16' |
+        date == '2013-07-04' | date == '2013-07-28' |
+        date == '2013-09-02' | date == '2013-09-08' | date == '2013-09-11' | date == '2013-09-16' | date == '2013-09-17' | date == '2013-09-27' | 
+        date == '2013-10-14' | date == '2013-10-16' | date == '2013-10-19' | date == '2013-10-31' | 
+        date == '2013-11-03' | date == '2013-11-11' | date == '2013-11-28' | date == '2013-11-29' | 
+        date == '2013-12-02' | date == '2013-12-07' | date == '2013-12-25' | date == '2013-12-31')
+      #holidays via https://www.calendar-365.com/holidays/2013.html
+    {
+      data[i, 3] <- as.character("public holiday")
+    }
+  }
+  return(data)
+}
+
+daily4 <- extract_term_from_Saturday(daily)
+daily5 <- extract_public_holidays(daily4)
+
+mod5 <- lm(n ~ wday, data = daily5)
+
+grid <- daily5 %>% 
+  data_grid(wday) %>% 
+  add_predictions(mod5, "n")
+grid
+
+daily5 %>%
+ggplot(aes(wday, n)) +
+  geom_boxplot() + 
+  geom_point(data = grid, colour="red")
+
+daily5 %>%
+  ggplot(aes(wday, resid)) +
+  geom_ref_line(h = 0) + 
+  geom_boxplot() + 
+  geom_point()
+```
+
+We can see from this that public holidays have several more outliers than do most days of the week. Sunday comes the closest after that. We can also tell from this boxplot that even the median of points is more spread out than regular days of the week.
+
+We can compare this to every day and term by looking at the below.
+
+```{r 8c}
+mod2 <- lm(n ~ wday * term, data = daily)
+
+grid <- daily %>% 
+  data_grid(wday, term) %>% 
+  add_predictions(mod2, "n")
+
+ggplot(daily, aes(wday, resid)) +
+  geom_boxplot() + 
+  geom_point() + 
+  facet_wrap(~ term)
+```
+
+
+We can see from comparing these that some of the holidays that were the largest outliers in lowest number of flights occurred in the fall with a couple in the summer. We can tell this because these points match up between the two graphs.

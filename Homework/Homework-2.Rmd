@@ -1,0 +1,266 @@
+---
+title: "Homework 2"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(tidyverse)
+```
+
+#3.7.1 Exercises
+
+##(a) Consider the following plot:
+
+```{r 3.7.1a}
+ggplot(data = diamonds) +
+  stat_summary(
+    mapping = aes(x = cut, y = depth),
+    fun.ymin = min,
+    fun.ymax = max,
+    fun.y = median
+  )
+```
+What is the default geom associated with stat_summary()?
+
+geom_pointrange()
+
+How could you rewrite the plot code so that it drew the same graph, but used the default geom instead of stat_summary()?
+
+```{r 3.7.1a2}
+ggplot(data = diamonds) +
+  geom_pointrange(mapping = aes(x = cut, y = depth),
+                  stat = "summary",
+                  fun.ymin = min,
+                  fun.ymax = max,
+                  fun.y = median)
+```
+
+
+##(b) What does geom_col() do, and how is it different from geom_bar()?
+
+geom_col uses stat_identity, so it will give you a bar graph with the heights of the bars representing the values of the data. geom_bar, on the other hand, uses stat_count to determine the heights of the bars, so it will give you bar heights proportional to how many cases there are within each group. If we were to set geom_bar(stat = identity), this would be the same as geom_col()
+
+See: ?geom_col or ?geom_bar for more information.
+
+Examples:
+
+```{r 3.7.1b}
+ggplot(diamonds, aes(cut)) + geom_bar()
+```
+
+```{r 3.7.1b2}
+ggplot(diamonds, aes(x=cut, y=color)) + geom_col()
+```
+
+```{r 3.7.1b3}
+ggplot(diamonds, aes(x=cut, y=color)) + geom_bar(stat = "identity")
+```
+
+
+#3.8.1 Exercises
+
+##(a) What is the problem with this plot? How could you improve it?
+
+```{r 3.8.1a}
+ggplot(data = mpg, mapping = aes(x = cty, y = hwy)) + 
+  geom_point()
+```
+
+Many of the data points overlap because there are several that fall directly on top of one another. We can jitter or slightly scatter the points, which will improve the overall visualization.
+
+```{r 3.8.1a2}
+ggplot(data = mpg, mapping = aes(x = cty, y = hwy)) + 
+  geom_jitter()
+```
+
+
+##(b) Compare and contrast geom_jitter() with geom_count().
+
+```{r 3.8.1b}
+ggplot(data = mpg, mapping = aes(x = cty, y = hwy)) + 
+  geom_jitter()
+```
+
+```{r 3.8.1b2}
+ggplot(data = mpg, mapping = aes(x = cty, y = hwy)) + 
+  geom_count()
+```
+
+Rather than slightly scattering the points, geom_count() counts the number of points at each location, then makes the point size proportional to how many points are at that location.
+
+
+##(c) What is the default position adjustment for geom_boxplot()? Create a visualization of the mpg dataset that demonstrates it.
+
+The default position adjustment is position_dodge().
+
+```{r 3.8.1c}
+ggplot(data = mpg, mapping = aes(x = trans, y = cty, color = fl)) + 
+  geom_boxplot(position = "dodge")
+```
+
+
+
+#3.9.1 Exercises
+
+##(a) Turn a stacked bar chart into a pie chart using coord_polar().
+
+```{r 3.9.1a}
+ggplot(data = mpg, mapping = aes(x=factor(1), fill = drv)) +
+  geom_bar(width = 1) +
+  coord_polar(theta = "y")
+```
+
+
+
+##(b) What is the difference between coord_quickmap() and coord_map()? ---- 
+
+coord_map() projects a portion of the 3D earth onto a flat plane. coord_map() has to project all of the elements of the graphic. coord_quickmap() preserves lines of latitude and longitude as straight and is therefore faster to draw, but it is also a little less accurate.
+
+
+##(c) What does the plot below tell you about the relationship between city and highway mpg? Why is coord_fixed() important? What does geom_abline() do?
+
+```{r 3.9.1c}
+ggplot(data = mpg, mapping = aes(x = cty, y = hwy)) +
+  geom_point() + 
+  geom_abline() +
+  coord_fixed()
+```
+
+The relationship seems to be linear with cars having slightly better highway mileage than city mileage. coord_fixed() makes the plat have equal intervals on the x and y axes so they are directly comparable. geom_abline() draws a line that has a slope of 1. This helps us visualize automobile gas efficiency and conclude that on average, highway is slightly higher than city.
+
+
+#5.2.4 Exercises
+
+##(a) For the nycflights13::flights dataset, find all flights that:
+###(1) Had an arrival delay of two or more hours
+
+```{r 5.2.4a1}
+library(nycflights13)
+filter(flights, arr_delay>=120)
+```
+
+###(2) Flew to Houston (IAH or HOU)
+
+```{r 5.2.4a2}
+filter(flights, dest=="IAH" | dest=="HOU")
+```
+
+###(3) Were operated by United, American, or Delta
+
+```{r 5.2.4a3}
+filter(flights, carrier=="UA" |
+         carrier=="AA" |
+         carrier=="DL")
+```
+
+###(4) Departed in summer (July, August, and September)
+
+```{r 5.2.4a4}
+filter(flights, month>=7, month<=9)
+```
+
+###(5) Arrived more than two hours late, but didn’t leave late
+
+```{r 5.2.4a5}
+filter(flights, arr_delay>=120, dep_delay<=0)
+```
+
+###(6) Were delayed by at least an hour, but made up over 30 minutes in flight
+
+```{r 5.2.4a6}
+filter(flights, dep_delay>=60, dep_delay-arr_delay>=30)
+```
+###(7) Departed between midnight and 6am (inclusive)
+
+```{r 5.2.4a7}
+filter(flights, dep_time>=0, dep_time<=600)
+```
+
+
+##(b) Why is NA ^ 0 not missing? Why is NA | TRUE not missing? Why is FALSE & NA not missing? Can you figure out the general rule? (NA * 0 is a tricky counterexample!)
+
+*NA ^ 0 - anything to the 0th power is 1.
+*NA | TRUE - as long as one condition is TRUE, the result is TRUE. TRUE is TRUE, thus this is always TRUE.
+*FALSE & NA - NA indicates the absence of a value, so it is ignored.
+
+Any operation on a missing value (NA) becomes a missing value. For example, NA * 0 is NA. In conditional expressions, missing values are ignored.
+
+
+#5.3.1 Exercises
+
+##(a) How could you use arrange() to sort all missing values to the start? (Hint: use is.na()).
+
+```{r 5.3.1a2}
+arrange(flights, !is.na(dep_time))
+```
+
+
+##(b) Which flights travelled the longest distance? Which travelled the shortest?
+
+```{r 5.3.1b}
+arrange(flights, desc(distance))
+```
+
+```{r 5.3.1b2}
+arrange(flights, distance)
+```
+
+
+#5.4.1 Exercises
+
+##(a) Brainstorm as many ways as possible to select dep_time, dep_delay, arr_time, and arr_delay from flights.
+
+```{r 5.4.1a}
+select(flights, dep_time, dep_delay, arr_time, arr_delay)
+```
+
+```{r 5.4.1a2}
+select(flights, ends_with("delay"))
+```
+
+```{r 5.4.1a3}
+select(flights, contains("delay"))
+```
+
+```{r 5.4.1a4}
+select(flights, starts_with("dep"), starts_with("arr"))
+```
+
+
+##(b) What does the one_of() function do? Why might it be helpful in conjunction with this vector?
+
+```{r 5.4.1b}
+vars <- c("year", "month", "day", "dep_delay", "arr_delay")
+```
+
+It selects any variable that matches with any item in the vector.
+
+```{r 5.4.1b2}
+select(flights, one_of(vars))
+```
+
+
+#5.5.2 Exercises
+
+##(a) Currently dep_time and sched_dep_time are convenient to look at, but hard to compute with because they’re not really continuous numbers. Convert them to a more convenient representation of number of minutes since midnight.
+
+```{r 5.5.2a}
+transmute(flights,
+       sched_dep_time = (sched_dep_time %/% 100)*60 + sched_dep_time %% 100,
+       dep_time = (dep_time %/% 100)*60 + dep_time %% 100)
+```
+
+
+
+##(b) Compare air_time with arr_time - dep_time. What do you expect to see? What do you see? What do you need to do to fix it?
+
+```{r 5.5.2b}
+flights2 <- select(flights, air_time, arr_time, dep_time)
+mutate(flights2, air_time_new = arr_time-dep_time)
+```
+
+dep_time and arr_time are not measured in minutes. Therefore, these are not the same. We must make these variable continuous to calculate air_time.

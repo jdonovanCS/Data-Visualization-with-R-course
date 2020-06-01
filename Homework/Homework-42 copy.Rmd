@@ -1,0 +1,234 @@
+---
+title: "Homework 4"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, cache=TRUE, fig.asp=0.65, fig.width=4.5)
+require(tidyverse)
+library(modelr)
+library(splines)
+options(na.action = na.warn)
+```
+
+
+#23.2.1 Exercises
+
+
+##(1) 23.2.1 Exercise 1
+
+One downside of the linear model is that it is sensitive to unusual values because the distance incorporates a squared term. Fit a linear model to the simulated data below, and visualize the results. Rerun everything 6 times to generate different simulated datasets, and also examine the slope and intercept of the generated models, as well as the R2R2 values. How much variability do you see? How do the data values affect the model?
+
+```{r 1a}
+sim1a <- tibble(
+  x = rep(1:10, each = 3),
+  y = x * 1.5 + 6 + rt(length(x), df = 2)
+)
+```
+
+Hint: To make it easy to do this 6 times, it makes sense to wrap everything into a function, and call that from within a for loop. The following code will help you accomplish this:
+
+```{r 1b}
+p <- ggplot(sim1, aes(x, y)) + 
+  geom_point()
+print(p)
+```
+
+```{r 1c}
+#Answer in a for loop
+for(i in 1:6){
+  sim1a <- tibble(
+    x=rep(1:10, each=3),
+    y=x*1.5+6+rt(length(x), df=2)
+  )
+
+  sim1a_mod <- lm(y ~x, data = sim1a)
+  coef(sim1a_mod) %>% str()
+  p3 <- summary(sim1a_mod)$r.squared * 100
+  print(p3)
+  
+  p4 <- ggplot(sim1a, aes(x, y)) +
+  geom_point(size = 2, color = "grey40") +
+  geom_abline(intercept = coef(sim1a_mod)[1], slope = coef(sim1a_mod)[2], color = "blue")
+  print(p4)
+  
+  grid <- sim1a %>%
+    add_predictions(sim1a_mod)
+  print(grid)
+}
+```
+
+There is some variability, but only to a certain extent. Slopes seem to be contained between the following (1< slope < 2), and the intercept varies between (4 < intercept < 7). This is for the observance of the data, but if we were to generate more datasets and especially if we were to change the method in which we are doing so, we would see different slopes and intercepts. The data shifts the data up and down and the slope slightly, but overall the data seems to all have a positive slope within the above parameters and intercepts.
+
+--Still need to write how the data affects the models
+
+
+##(2) 23.2.1 Exercise 2
+
+One way to make linear models more robust is to use a different distance measure. For example, instead of root-mean-squared (RMS) distance, you could use mean-absolute-deviation (MAD) distance:
+
+Use optim() to fit this model to the simulated data above and visually compare it to the linear model, again examining at least 6 instances. You want both models to be drawn on top of each instance of the simulated data set. Discuss what you find.
+
+Hints: make_prediction() is not a built-in function; you will need to create your own linear function. Unlike Exercise 1, here you should only compare the models graphically; I don’t think the R2R2 metric is meaningful for a model that uses the MAD distance measure.
+
+```{r 2a}
+#Answer in a for loop
+
+make_prediction <- function(a, data) {
+  a[1] + data$x*a[2]
+}
+
+measure_distance <- function(a, data) {
+  diff <- data$y - make_prediction(a, data)
+  mean(abs(diff))
+}
+
+for(i in 1:6){
+  sim1a <- tibble(
+    x=rep(1:10, each=3),
+    y=x*1.5+6+rt(length(x), df=2)
+  )
+
+  p <- ggplot(sim1a, aes(x, y)) + 
+    geom_point()
+  print(p)
+
+  models <- tibble(
+    a0 = runif(250, -20, 40),
+    a1 = runif(250, -5, 5)
+  )
+  
+  best <- optim(c(0, 0), measure_distance, data = sim1)
+  best %>% str()
+
+  p2 <- ggplot(sim1a, aes(x,y)) + geom_abline(aes(intercept = a0, slope=a1), data = models, alpha = 1/4) + geom_point() + geom_abline(intercept = best$par[1], slope = best$par[2], color = "blue")
+  print(p2)
+
+  
+  
+  p4 <- ggplot(sim1a, aes(x, y)) +
+  geom_point(size = 2, color = "grey40") +
+  geom_abline(intercept = best$par[1], slope = best$par[2], color = "blue")
+  print(p4)
+  
+  
+}
+
+
+```
+
+
+#23.3.3 Exercises
+
+##(3) 23.3.3 Exercise 1
+
+Instead of using lm() to fit a straight line, you can use loess() to fit a smooth curve. Repeat the process of model fitting, grid generation, predictions, and visualization on sim1 using loess() instead of lm(). How does the result compare to geom_smooth()?
+
+```{r 3a}
+  sim1a <- tibble(
+    x=rep(1:10, each=3),
+    y=x*1.5+6+rt(length(x), df=2)
+  )
+
+  sim1a_mod <- loess(y ~x, data = sim1a)
+  coef(sim1a_mod) %>% str()
+  p3 <- summary(sim1a_mod)$r.squared * 100
+  print(p3)
+  
+  sim1a_mod2 <- lm(y ~x, data = sim1a)
+  coef(sim1a_mod2) %>% str()
+  p3b <- summary(sim1a_mod2)$r.squared
+  print(p3b)
+  
+  p4 <- ggplot(sim1a, aes(x, y)) +
+  geom_point(size = 2, color = "grey40") +
+  geom_smooth(color = "blue") +
+  geom_abline(intercept = coef(sim1a_mod2)[1], slope = coef(sim1a_mod2)[2], color = "red")
+  print(p4)
+  
+  grid <- sim1a %>%
+    add_predictions(sim1a_mod)
+  print(grid)
+
+```
+
+
+##(4) 23.3.3 Exercise 2
+
+add_predictions() is paired with gather_predictions() and  spread_predictions(). Use both gather_predictions() and  spread_predictions() to repeat the analysis with the two models used in problem (3) above. How do these three functions differ?
+
+```{r 4a}
+
+sim1a
+
+grid <- sim1a %>%
+  add_predictions(sim1a_mod2) %>%
+  add_predictions(sim1a_mod) %>%
+print(grid)
+  
+grid <- sim1a %>%
+  gather_predictions(sim1a_mod2, sim1a_mod) %>%
+print(grid1)
+
+grid <- sim1a %>%
+  spread_predictions(sim1a_mod2, sim1a_mod) %>%
+print(grid2)
+```
+
+Add_predictions adds a single column with predictions. Gather_predictions adds a column for models and a column for predictions, and spread_predictions adds a column for each models' predictions.
+
+
+##(5) 23.3.3 Exercise 3
+
+What does geom_ref_line() do? What package does it come from? Why is displaying a reference line in plots showing residuals useful and important?
+
+It adds a reference line for comparison. It is contained in the modelr package. It can give us a line in which to compare our residual values. This can make it more clear how the data is distributed. It can also make it more clear how a best fit line is oriented and why.
+
+
+##(6) 23.3.3 Exercise 4
+
+Why might you want to look at a frequency polygon of absolute residuals? What are the pros and cons compared to looking at the raw residuals?
+
+A frequency polygon of absolute residuals can supply us with data about the distribution of residual values within our data and a fitted model. Looking at the raw residuals can give us specific values and probably a better idea of orientation of these based upon differences, where as a frequency polygon depending upon the binwidth will give us an idea of how the residuals are distributed from a bigger picture standpoint.
+
+
+#23.4.5 Exercises
+
+##(7) 23.4.5 Exercise 1
+
+What happens if you repeat the analysis of sim2 using a model without an intercept? What happens to the model equation? What happens to the predictions?
+
+```{r 7a}
+
+sim2
+
+sim2_mod <- lm(y ~0, data = sim2)
+  coef(sim2_mod) %>% str()
+  p3 <- summary(sim2_mod)$r.squared * 100
+  print(p3)
+  
+  p4 <- ggplot(sim2, aes(x, y)) +
+  geom_point(size = 2, color = "grey40") +
+  geom_abline(slope = coef(sim2_mod)[1], color = "blue")
+  print(p4)
+  
+  grid <- sim2 %>%
+  add_predictions(sim2_mod) %>%
+  print(grid)
+  
+  ggplot(sim2, aes(x)) + geom_point(aes(y=y)) + 
+    geom_point(data = grid, aes(y=pred), colour="red", size=4)
+```
+
+The model equation is removed because there is a missing value of intercept for geom_abline. The predictions are all at y-value 0 across the four x-values on the x-axis.
+
+
+##(8) 23.4.5 Exercise 4
+
+For sim4, which of mod1 and mod2 is better? The book author believes that mod2 does a slightly better job at removing patterns, but claims the effects are subtle. Examine the R2R2 values for the two models, and develop a plot that attempts to support this claim. In the end, how well does your plot support the claim? How likely is it that the claim is true?
+
+Both seem fairly equally good for this simulation. I believe that mod1 is slightly more consistent and is thus a better model, but mod 2 seems pretty well fit as well.
+
